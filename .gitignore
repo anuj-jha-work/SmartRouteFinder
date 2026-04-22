@@ -1,0 +1,33 @@
+# Build outputs
+server
+server.exe
+*.out
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.pdb
+
+# Build directories
+build/
+dist/
+bin/
+obj/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# IDE/editor files
+.vs/
+.idea/
+*.VC.db
+*.opendb
+
+# OS files
+.DS_Store
+Thumbs.db

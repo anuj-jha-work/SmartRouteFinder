@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Route Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md p-8">
+    <h1 class="text-3xl font-bold text-center mb-6">Smart Route Finder</h1>
+
+    <div class="flex space-x-4">
+      <!-- Left Panel - Controls -->
+      <div class="w-1/2">
+        <div class="mb-4 border-b border-gray-200">
+          <nav class="flex space-x-2">
+            <button id="builderTab" class="px-4 py-2 font-medium text-sm rounded-t-lg bg-blue-100 text-blue-700">
+              Builder
+            </button>
+            <button id="algorithmTab" class="px-4 py-2 font-medium text-sm rounded-t-lg text-gray-500 hover:text-gray-700">
+              Algorithm
+            </button>
+          </nav>
+        </div>
+
+        <div id="builderContent" class="space-y-6">
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <h2 class="text-xl font-semibold mb-2">Add Location (Node)</h2>
+              <input id="nodeName" type="text" placeholder="Location name" class="border rounded p-2 w-full mb-2" />
+              <button onclick="addNode()" class="bg-blue-500 text-white px-4 py-2 rounded">Add Node</button>
+              <ul id="nodeList" class="mt-4 list-disc list-inside text-sm"></ul>
+            </div>
+
+            <div>
+              <h2 class="text-xl font-semibold mb-2">Connect Locations (Edge)</h2>
+              <input id="edgeFrom" type="text" placeholder="From" class="border rounded p-2 w-full mb-2" />
+              <input id="edgeTo" type="text" placeholder="To" class="border rounded p-2 w-full mb-2" />
+              <input id="edgeCost" type="number" placeholder="Cost/Distance" class="border rounded p-2 w-full mb-2" />
+              <button onclick="addEdge()" class="bg-green-500 text-white px-4 py-2 rounded">Add Edge</button>
+              <ul id="edgeList" class="mt-4 list-disc list-inside text-sm"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="algorithmContent" class="hidden space-y-6">
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold mb-2">Algorithm Selection</h2>
+            <div class="space-y-2">
+              <div class="flex items-center">
+                <input type="radio" id="dijkstra" name="algorithm" value="dijkstra" checked class="mr-2">
+                <label for="dijkstra">Dijkstra's Algorithm (Shortest Path)</label>
+              </div>
+              <div class="flex items-center">
+                <input type="radio" id="dfs" name="algorithm" value="dfs" class="mr-2">
+                <label for="dfs">Depth-First Search (DFS)</label>
+              </div>
+              <div class="flex items-center">
+                <input type="radio" id="bfs" name="algorithm" value="bfs" class="mr-2">
+                <label for="bfs">Breadth-First Search (BFS)</label>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 class="text-xl font-semibold mb-2">Find Path</h2>
+            <div class="grid grid-cols-3 gap-4">
+              <input id="sourceNode" type="text" placeholder="Source" class="border rounded p-2 w-full" />
+              <input id="destinationNode" type="text" placeholder="Destination" class="border rounded p-2 w-full" />
+              <button onclick="findPath()" class="bg-purple-600 text-white px-4 py-2 rounded">Find Path</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel - Visualization -->
+      <div class="w-1/2">
+        <div class="h-full border rounded-lg p-4">
+          <h2 class="text-xl font-semibold mb-4">Graph Visualization</h2>
+          <div id="graphVisualization" class="h-96 border rounded"></div>
+          <p class="mt-2 text-sm text-gray-500">Drag nodes to reposition them. Green = Start, Red = End, Orange = Path</p>
+          
+          <div id="pathResult" class="mt-6 p-4 bg-gray-50 rounded hidden">
+            <h3 class="text-lg font-semibold mb-2">Path Result</h3>
+            <div id="algorithmName" class="font-medium"></div>
+            <div id="pathDetails"></div>
+            <div id="distanceDetails"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let nodes = new Set();
+    let edges = [];
+    let network = null;
+
+    function initVisualization() {
+      const container = document.getElementById('graphVisualization');
+      const data = {
+        nodes: new vis.DataSet([]),
+        edges: new vis.DataSet([])
+      };
+      const options = {
+        nodes: { 
+          shape: 'dot', 
+          size: 20, 
+          font: { size: 14 }, 
+          borderWidth: 2,
+          color: {
+            border: '#2B7CE9',
+            background: '#97C2FC',
+            highlight: {
+              border: '#2B7CE9',
+              background: '#D2E5FF'
+            }
+          }
+        },
+        edges: { 
+          width: 2, 
+          arrows: { to: false }, 
+          font: { size: 12 }, 
+          smooth: { type: 'continuous' },
+          color: {
+            color: '#2B7CE9',
+            highlight: '#2B7CE9'
+          }
+        },
+        physics: { enabled: true, solver: 'forceAtlas2Based' }
+      };
+      network = new vis.Network(container, data, options);
+    }
+
+    document.getElementById('builderTab').addEventListener('click', function () {
+      document.getElementById('builderContent').classList.remove('hidden');
+      document.getElementById('algorithmContent').classList.add('hidden');
+      this.classList.add('bg-blue-100', 'text-blue-700');
+      document.getElementById('algorithmTab').classList.remove('bg-blue-100', 'text-blue-700');
+      document.getElementById('algorithmTab').classList.add('text-gray-500');
+    });
+
+    document.getElementById('algorithmTab').addEventListener('click', function () {
+      document.getElementById('algorithmContent').classList.remove('hidden');
+      document.getElementById('builderContent').classList.add('hidden');
+      this.classList.add('bg-blue-100', 'text-blue-700');
+      document.getElementById('builderTab').classList.remove('bg-blue-100', 'text-blue-700');
+      document.getElementById('builderTab').classList.add('text-gray-500');
+    });
+
+    function addNode() {
+      const name = document.getElementById("nodeName").value.trim();
+      if (!name) return alert("Node name cannot be empty");
+      if (nodes.has(name)) return alert("Node already exists");
+      
+      nodes.add(name);
+      document.getElementById("nodeList").innerHTML += `<li>${name}</li>`;
+      document.getElementById("nodeName").value = "";
+      
+      if (network) {
+        network.body.data.nodes.add({ 
+          id: name, 
+          label: name,
+          color: {
+            background: '#97C2FC',
+            border: '#2B7CE9'
+          }
+        });
+      }
+    }
+
+    function addEdge() {
+      const from = document.getElementById("edgeFrom").value.trim();
+      const to = document.getElementById("edgeTo").value.trim();
+      const cost = parseInt(document.getElementById("edgeCost").value);
+      
+      if (!from || !to) return alert("From and To fields are required");
+      if (isNaN(cost)) return alert("Cost must be a number");
+      if (!nodes.has(from)) return alert(`Node "${from}" doesn't exist`);
+      if (!nodes.has(to)) return alert(`Node "${to}" doesn't exist`);
+      if (from === to) return alert("Cannot create edge to the same node");
+
+      edges.push({ from, to, cost });
+      document.getElementById("edgeList").innerHTML += `<li>${from} → ${to} : ${cost}</li>`;
+      document.getElementById("edgeFrom").value = "";
+      document.getElementById("edgeTo").value = "";
+      document.getElementById("edgeCost").value = "";
+      
+      if (network) {
+        network.body.data.edges.add({ 
+          from, 
+          to, 
+          label: cost.toString(), 
+          color: {
+            color: '#2B7CE9',
+            highlight: '#2B7CE9'
+          }
+        });
+      }
+    }
+
+    function findPath() {
+      const source = document.getElementById("sourceNode").value.trim();
+      const destination = document.getElementById("destinationNode").value.trim();
+      const algorithm = document.querySelector('input[name="algorithm"]:checked').value;
+      
+      if (!source || !destination) return alert("Source and destination are required");
+      if (!nodes.has(source)) return alert(`Source node "${source}" doesn't exist`);
+      if (!nodes.has(destination)) return alert(`Destination node "${destination}" doesn't exist`);
+      
+      const requestData = {
+        nodes: Array.from(nodes),
+        edges: edges,
+        source: source,
+        destination: destination,
+        algorithm: algorithm
+      };
+
+      console.log("Sending request:", requestData);
+
+      fetch("/find-path", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log("Received response:", data);
+        if (!data.path) {
+          throw new Error("No path found between nodes");
+        }
+        displayPathResult(data, algorithm);
+        visualizePath(data.path);
+      })
+      .catch(error => {
+        console.error("Error:", error);
+        document.getElementById("pathResult").classList.remove("hidden");
+        document.getElementById("pathDetails").textContent = "Error: " + error.message;
+        document.getElementById("distanceDetails").textContent = "";
+        resetGraphColors();
+      });
+    }
+
+    function displayPathResult(data, algorithm) {
+      document.getElementById("pathResult").classList.remove("hidden");
+      document.getElementById("algorithmName").textContent = 
+        algorithm === 'dijkstra' ? "Dijkstra's Algorithm" :
+        algorithm === 'dfs' ? "Depth-First Search (DFS)" :
+        "Breadth-First Search (BFS)";
+      
+      document.getElementById("pathDetails").textContent = 
+        data.path.length ? `Path: ${data.path.join(" → ")}` : "No path found";
+      
+      document.getElementById("distanceDetails").textContent = 
+        data.path.length ? `Total Distance: ${data.cost}` : "";
+    }
+
+    function visualizePath(path) {
+      if (!network || !path || path.length === 0) return;
+
+      // Reset all colors first
+      resetGraphColors();
+
+      const nodesDataset = network.body.data.nodes;
+      const edgesDataset = network.body.data.edges;
+
+      // Color the path nodes
+      nodesDataset.update({ id: path[0], color: { background: '#4CAF50', border: '#2E7D32' } }); // Start = green
+      nodesDataset.update({ id: path[path.length - 1], color: { background: '#F44336', border: '#C62828' } }); // End = red
+      
+      for (let i = 1; i < path.length - 1; i++) {
+        nodesDataset.update({ id: path[i], color: { background: '#FF9800', border: '#F57C00' } }); // Path = orange
+      }
+
+      // Color the path edges
+      for (let i = 0; i < path.length - 1; i++) {
+        edgesDataset.forEach(edge => {
+          if ((edge.from === path[i] && edge.to === path[i + 1]) || 
+              (edge.to === path[i] && edge.from === path[i + 1])) {
+            edgesDataset.update({ id: edge.id, color: { color: '#FF9800', highlight: '#FF9800' } });
+          }
+        });
+      }
+    }
+
+    function resetGraphColors() {
+      if (!network) return;
+
+      const nodesDataset = network.body.data.nodes;
+      const edgesDataset = network.body.data.edges;
+
+      nodesDataset.forEach(node => {
+        nodesDataset.update({ 
+          id: node.id, 
+          color: { 
+            background: '#97C2FC', 
+            border: '#2B7CE9' 
+          } 
+        });
+      });
+
+      edgesDataset.forEach(edge => {
+        edgesDataset.update({ 
+          id: edge.id, 
+          color: { 
+            color: '#2B7CE9', 
+            highlight: '#2B7CE9' 
+          } 
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initVisualization);
+  </script>
+</body>
+</html>

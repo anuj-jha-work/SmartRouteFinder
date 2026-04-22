@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: smart-route-finder-cpp
+    runtime: native
+    buildCommand: g++ main.cpp -o server -I include -std=c++17 -O3 -pthread
+    startCommand: ./server
+    plan: free
+    autoDeploy: true
