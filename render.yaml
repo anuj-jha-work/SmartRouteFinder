@@ -4,5 +4,6 @@ services:
     runtime: node
     buildCommand: g++ main.cpp -o server -I include -std=c++17 -O3 -pthread
     startCommand: ./server
+    healthCheckPath: /healthz
     plan: free
     autoDeployTrigger: commit

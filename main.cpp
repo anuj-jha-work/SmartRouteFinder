@@ -8,6 +8,9 @@
 #include <cstdlib>
 #include <climits>
 #include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include "httplib.h"
 #include "nlohmann/json.hpp"
 
@@ -192,7 +195,51 @@ ResponseData bfs(const string& start, const string& end, const unordered_map<str
 int main() {
     httplib::Server svr;
 
-    svr.set_mount_point("/", "./public");
+    vector<string> public_dirs = {
+        "./public",
+        "public",
+        "/opt/render/project/src/public"
+    };
+
+    string resolved_public_dir;
+    for (const auto& dir : public_dirs) {
+        if (filesystem::exists(dir) && filesystem::is_directory(dir)) {
+            resolved_public_dir = dir;
+            break;
+        }
+    }
+
+    bool mounted = false;
+    if (!resolved_public_dir.empty()) {
+        mounted = svr.set_mount_point("/", resolved_public_dir.c_str());
+        cout << "Static directory: " << resolved_public_dir << " (mounted=" << (mounted ? "true" : "false") << ")" << endl;
+    } else {
+        cerr << "Warning: public directory not found; static hosting may fail." << endl;
+    }
+
+    svr.Get("/", [resolved_public_dir](const httplib::Request&, httplib::Response& res) {
+        if (resolved_public_dir.empty()) {
+            res.status = 500;
+            res.set_content("public/index.html not found", "text/plain");
+            return;
+        }
+
+        string index_path = resolved_public_dir + "/index.html";
+        ifstream file(index_path);
+        if (!file) {
+            res.status = 404;
+            res.set_content("index.html not found", "text/plain");
+            return;
+        }
+
+        stringstream buffer;
+        buffer << file.rdbuf();
+        res.set_content(buffer.str(), "text/html; charset=utf-8");
+    });
+
+    svr.Get("/healthz", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content("ok", "text/plain");
+    });
 
     svr.Post("/find-path", [](const httplib::Request& req, httplib::Response& res) {
         // Set CORS headers
