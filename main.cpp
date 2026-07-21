@@ -60,12 +60,11 @@ unordered_map<string, vector<Edge>> buildGraph(const vector<string>& nodes, cons
         graph[node] = vector<Edge>();
     }
     for (const auto& e : edges) {
-        graph[e.from].push_back(e);
-        Edge reverse_edge{e.to, e.from, e.cost};
-        graph[e.to].push_back(reverse_edge);
+        graph[e.from].push_back(e); // Only add the directional edge
     }
     return graph;
 }
+
 
 int calculatePathCost(const vector<string>& path, const unordered_map<string, vector<Edge>>& graph) {
     int cost = 0;
